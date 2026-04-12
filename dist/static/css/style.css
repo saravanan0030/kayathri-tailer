@@ -1,0 +1,451 @@
+/* Kayathri Tailor — theme: warm ivory, deep plum, gold accent */
+:root {
+  --color-bg: #faf7f2;
+  --color-surface: #ffffff;
+  --color-ink: #1a1523;
+  --color-muted: #6b6574;
+  --color-accent: #b8860b;
+  --color-accent-dark: #8b6914;
+  --color-plum: #2d1f3d;
+  --color-plum-soft: #3d2d4f;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-body: "Outfit", system-ui, sans-serif;
+  --shadow-soft: 0 18px 50px rgba(45, 31, 61, 0.08);
+  --radius: 1rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-ink);
+  min-height: 100vh;
+  position: relative;
+}
+
+.bg-pattern {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.4;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(184, 134, 11, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(45, 31, 61, 0.06) 0%, transparent 40%);
+  z-index: 0;
+}
+
+main,
+.site-header,
+.site-footer {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+.site-header {
+  background: rgba(250, 247, 242, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(45, 31, 61, 0.06);
+}
+
+.navbar-brand {
+  font-family: var(--font-display);
+}
+
+.brand-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--color-plum), var(--color-plum-soft));
+  color: #f5e6c8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.25rem;
+  box-shadow: var(--shadow-soft);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brand-title {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-plum);
+}
+
+.brand-sub {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-weight: 500;
+}
+
+.navbar .nav-link {
+  color: var(--color-ink);
+  font-weight: 500;
+  padding: 0.5rem 0.75rem !important;
+  border-radius: 999px;
+}
+
+.navbar .nav-link:hover {
+  color: var(--color-accent-dark);
+  background: rgba(184, 134, 11, 0.1);
+}
+
+.bill-pill {
+  background: linear-gradient(135deg, var(--color-accent), #d4a84b) !important;
+  color: var(--color-plum) !important;
+  font-weight: 700;
+  padding: 0.5rem 1rem !important;
+  font-size: 0.95rem;
+}
+
+.navbar-toggler {
+  filter: invert(0.2);
+}
+
+/* Hero */
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 700;
+  color: var(--color-plum);
+  line-height: 1.15;
+}
+
+.hero-eyebrow {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  color: var(--color-accent-dark);
+  font-weight: 600;
+}
+
+.hero-lead {
+  font-size: 1.05rem;
+  max-width: 32rem;
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, var(--color-plum), var(--color-plum-soft));
+  border: none;
+  color: #faf7f2;
+  font-weight: 600;
+}
+
+.btn-accent:hover {
+  background: var(--color-plum);
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-soft);
+}
+
+.hero-card {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(45, 31, 61, 0.06);
+}
+
+.hero-date {
+  font-weight: 600;
+  color: var(--color-plum);
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-plum);
+}
+
+.stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-muted);
+}
+
+.text-accent {
+  color: var(--color-accent-dark) !important;
+}
+
+/* Catalog */
+.section-title {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-plum);
+}
+
+.catalog-filters .btn {
+  border-radius: 999px;
+  font-size: 0.85rem;
+  margin: 0.15rem;
+}
+
+.catalog-filters .btn-outline-secondary {
+  border-color: rgba(45, 31, 61, 0.15);
+  color: var(--color-ink);
+}
+
+.catalog-filters .btn-outline-secondary:hover,
+.catalog-filters .btn-outline-secondary.active {
+  background: var(--color-plum);
+  border-color: var(--color-plum);
+  color: #faf7f2;
+}
+
+.product-card {
+  background: var(--color-surface);
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid rgba(45, 31, 61, 0.06);
+  box-shadow: 0 8px 30px rgba(45, 31, 61, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-soft);
+}
+
+.product-card .ratio {
+  background: linear-gradient(180deg, #ede8e0 0%, #e0d9ce 100%);
+}
+
+.product-card img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+}
+
+.product-card-body {
+  padding: 1.1rem 1.25rem 1.25rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-name {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--color-plum);
+  margin-bottom: 0.15rem;
+}
+
+.product-name-ta {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin-bottom: 0.5rem;
+}
+
+.product-price {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-accent-dark);
+}
+
+.product-unit {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.qty-row {
+  margin-top: auto;
+  padding-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qty-controls {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  border: 1px solid rgba(45, 31, 61, 0.12);
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.qty-controls button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--color-plum);
+  font-size: 1.25rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.qty-controls button:hover {
+  background: rgba(184, 134, 11, 0.15);
+}
+
+.qty-controls button:active {
+  transform: scale(0.96);
+}
+
+.qty-controls .qty-value {
+  min-width: 2.25rem;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.product-line-total {
+  font-weight: 700;
+  color: var(--color-plum);
+  white-space: nowrap;
+}
+
+/* Bill */
+.section-bill {
+  background: linear-gradient(180deg, transparent 0%, rgba(45, 31, 61, 0.03) 100%);
+}
+
+.bill-paper {
+  background: var(--color-surface);
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(45, 31, 61, 0.08);
+}
+
+.bill-shop-name {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  color: var(--color-plum);
+}
+
+.bill-table thead th {
+  font-size: 0.7rem;
+  border-bottom: 1px solid rgba(45, 31, 61, 0.1);
+  padding-bottom: 0.5rem;
+}
+
+.bill-table tbody td {
+  padding: 0.65rem 0;
+  vertical-align: middle;
+  border-bottom: 1px solid rgba(45, 31, 61, 0.06);
+  font-size: 0.95rem;
+}
+
+.bill-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.site-footer {
+  border-top: 1px solid rgba(45, 31, 61, 0.06);
+}
+
+.owner-nav-btn {
+  color: var(--color-ink) !important;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.owner-nav-btn:hover {
+  color: var(--color-accent-dark) !important;
+}
+
+.owner-modal-content {
+  border-radius: var(--radius);
+  border: 1px solid rgba(45, 31, 61, 0.08);
+}
+
+.owner-price-table thead th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+}
+
+.owner-price-table td {
+  vertical-align: middle;
+}
+
+.history-content .history-block {
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(45, 31, 61, 0.08);
+}
+
+.history-content .history-block:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.history-content .history-table th {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-muted);
+}
+
+@media print {
+  .site-header,
+  .hero,
+  .section-catalog,
+  .bill-actions,
+  .site-footer,
+  .catalog-filters,
+  .bg-pattern,
+  #ownerModal,
+  #historyModal {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .section-bill {
+    background: none;
+  }
+
+  .bill-paper {
+    box-shadow: none;
+    border: none;
+    padding: 0 !important;
+  }
+
+  #bill {
+    padding-top: 0 !important;
+  }
+
+  .col-lg-5 {
+    display: none !important;
+  }
+
+  .col-lg-7 {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 991.98px) {
+  .hero-card {
+    margin-top: 0.5rem;
+  }
+}
