@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kayathri Tailor — Billing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <div class="bg-pattern"></div>
+
+  <header class="site-header sticky-top">
+    <nav class="navbar navbar-expand-lg">
+      <div class="container">
+        <a class="navbar-brand d-flex align-items-center gap-2" href="#">
+          <span class="brand-mark">K</span>
+          <span class="brand-text">
+            <span class="brand-title">Kayathri</span>
+            <span class="brand-sub">Tailor &amp; Boutique</span>
+          </span>
+        </a>
+        <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="Toggle menu">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navMain">
+          <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-2">
+            <li class="nav-item"><a class="nav-link" href="#catalog">Price list</a></li>
+            <li class="nav-item"><a class="nav-link" href="#bill">Your bill</a></li>
+            <li class="nav-item">
+              <button type="button" class="nav-link btn btn-link text-start text-lg-center border-0 py-2 px-lg-2 owner-nav-btn" data-bs-toggle="modal" data-bs-target="#ownerModal">Edit prices</button>
+            </li>
+            <li class="nav-item">
+              <button type="button" class="nav-link btn btn-link text-start text-lg-center border-0 py-2 px-lg-2 owner-nav-btn" data-bs-toggle="modal" data-bs-target="#historyModal">Price history</button>
+            </li>
+            <li class="nav-item ms-lg-3">
+              <span class="badge rounded-pill bill-pill" id="headerTotal">₹0</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero py-5">
+      <div class="container">
+        <div class="row align-items-center g-4">
+          <div class="col-lg-7">
+            <p class="hero-eyebrow mb-2">Stitching · Alterations · Custom fit</p>
+            <h1 class="hero-title">Billing made simple — pick a style, set quantity, get your total.</h1>
+            <p class="hero-lead text-muted">Browse the price list with photos, tap +/− for quantity, and print a clean bill for your customer.</p>
+            <a class="btn btn-accent btn-lg rounded-pill px-4" href="#catalog">Start billing</a>
+          </div>
+          <div class="col-lg-5">
+            <div class="hero-card p-4 rounded-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-uppercase small fw-semibold text-muted">Today</span>
+                <span class="hero-date" id="heroDate"></span>
+              </div>
+              <div class="hero-stat row g-3 text-center">
+                <div class="col-4">
+                  <div class="stat-value" id="statItems">0</div>
+                  <div class="stat-label">Line items</div>
+                </div>
+                <div class="col-4">
+                  <div class="stat-value" id="statQty">0</div>
+                  <div class="stat-label">Total qty</div>
+                </div>
+                <div class="col-4">
+                  <div class="stat-value text-accent" id="statTotal">₹0</div>
+                  <div class="stat-label">Bill total</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="catalog" class="py-5 section-catalog">
+      <div class="container">
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end gap-3 mb-4">
+          <div>
+            <h2 class="section-title mb-1">Price list</h2>
+            <p class="text-muted mb-0">Each card shows image, rate per unit, and quantity. Owner can change rates from <strong>Edit prices</strong> in the menu.</p>
+          </div>
+          <div class="catalog-filters btn-group flex-wrap" role="group" aria-label="Filter category">
+            <button type="button" class="btn btn-outline-secondary active" data-filter="all">All</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="Blouse">Blouse</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="Women">Women</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="Men">Men</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="Kids">Kids</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="Unisex">Unisex</button>
+            <button type="button" class="btn btn-outline-secondary" data-filter="Service">Service</button>
+          </div>
+        </div>
+        <div class="row g-4" id="productGrid">
+          <div class="col-12 text-center py-5" id="loadingState">
+            <div class="spinner-border text-accent" role="status"><span class="visually-hidden">Loading…</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="bill" class="py-5 section-bill">
+      <div class="container">
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <h2 class="section-title mb-3">Your bill</h2>
+            <p class="text-muted">Only items with quantity &gt; 0 appear here. Adjust in the price list above.</p>
+            <div class="bill-actions d-flex flex-wrap gap-2 mt-4">
+              <button type="button" class="btn btn-outline-secondary rounded-pill" id="btnClear">Clear all</button>
+              <button type="button" class="btn btn-accent rounded-pill" id="btnPrint">Print bill</button>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="bill-paper rounded-4 p-4 p-md-5" id="billPaper">
+              <div class="bill-header text-center border-bottom pb-3 mb-4">
+                <h3 class="bill-shop-name mb-1">Kayathri Tailor</h3>
+                <p class="small text-muted mb-0">Billing receipt · <span id="billDate"></span></p>
+              </div>
+              <div class="table-responsive">
+                <table class="table table-borderless bill-table mb-0">
+                  <thead>
+                    <tr class="small text-muted text-uppercase">
+                      <th>Item</th>
+                      <th class="text-end">Qty</th>
+                      <th class="text-end">Rate</th>
+                      <th class="text-end">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody id="billRows"></tbody>
+                </table>
+              </div>
+              <div id="billEmpty" class="text-center text-muted py-4">No items yet — add quantities from the price list.</div>
+              <div class="bill-footer pt-4 mt-3 border-top d-none" id="billFooter">
+                <div class="d-flex justify-content-between align-items-center">
+                  <span class="fw-semibold">Grand total</span>
+                  <span class="bill-grand fs-4 fw-bold text-accent" id="billGrand">₹0</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="modal fade" id="historyModal" tabindex="-1" aria-labelledby="historyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-xl">
+      <div class="modal-content owner-modal-content">
+        <div class="modal-header border-0 pb-0">
+          <div>
+            <h2 class="modal-title h5 fw-bold" id="historyModalLabel">Price history (1 year)</h2>
+            <p class="small text-muted mb-0">Each time you <strong>Save prices</strong>, a snapshot is stored. Entries older than one year are removed automatically.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <div class="row g-2 align-items-end mb-3">
+            <div class="col-md-6 col-lg-4">
+              <label for="historyPin" class="form-label small fw-semibold mb-1">Owner PIN</label>
+              <input type="password" class="form-control" id="historyPin" autocomplete="current-password" placeholder="Same PIN as Edit prices">
+            </div>
+            <div class="col-auto">
+              <button type="button" class="btn btn-accent rounded-pill px-4" id="historyLoadBtn">Load history</button>
+            </div>
+          </div>
+          <div id="historyAlert" class="alert d-none py-2" role="alert"></div>
+          <div id="historyContent" class="history-content small"></div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="ownerModal" tabindex="-1" aria-labelledby="ownerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-scrollable modal-lg">
+      <div class="modal-content owner-modal-content">
+        <div class="modal-header border-0 pb-0">
+          <div>
+            <h2 class="modal-title h5 fw-bold" id="ownerModalLabel">Edit prices (owner)</h2>
+            <p class="small text-muted mb-0">Type your PIN, change rupee amounts, tap Save. Names stay the same — only prices update. If you forgot the PIN, open <code>app.py</code> on this PC and check <code>OWNER_PIN</code>.</p>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body pt-2">
+          <label for="ownerPin" class="form-label small fw-semibold">Owner PIN</label>
+          <input type="password" class="form-control form-control-lg mb-3" id="ownerPin" autocomplete="current-password" placeholder="Enter PIN">
+          <div id="ownerAlert" class="alert d-none py-2" role="alert"></div>
+          <div class="table-responsive rounded-3 border">
+            <table class="table table-hover mb-0 owner-price-table">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">Item</th>
+                  <th scope="col" class="text-end" style="min-width:8rem">₹ Price</th>
+                </tr>
+              </thead>
+              <tbody id="ownerPriceRows"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary rounded-pill" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-accent rounded-pill px-4" id="ownerSaveBtn">Save prices</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="site-footer py-4 mt-5">
+    <div class="container text-center small text-muted">
+      Kayathri Tailor — local billing helper · Built with Python, Flask, Bootstrap 5
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

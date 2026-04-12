@@ -1,0 +1,92 @@
+[
+  {
+    "id": "blouse-normal",
+    "name": "Normal blouse",
+    "price": 353.0,
+    "unit": "piece",
+    "category": "Blouse",
+    "image": "/static/images/blouse-normal.jpg",
+    "name_ta": "சாதாரண ப்ளவுஸ்"
+  },
+  {
+    "id": "blouse-designing",
+    "name": "Designing blouse",
+    "price": 550.0,
+    "unit": "piece",
+    "category": "Blouse",
+    "image": "/static/images/blouse-designing.jpg",
+    "name_ta": "டிசைன் ப்ளவுஸ்"
+  },
+  {
+    "id": "old-dress",
+    "name": "Old dress",
+    "price": 400.0,
+    "unit": "piece",
+    "category": "Women",
+    "image": "https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&h=400&fit=crop",
+    "name_ta": "பழைய உடை (மாற்றம் / மறுபயன்)"
+  },
+  {
+    "id": "churidar",
+    "name": "Sudithar set",
+    "price": 650.0,
+    "unit": "set",
+    "category": "Women",
+    "image": "/static/images/churidar-set.jpg",
+    "name_ta": "சுரிதார் / சல்வார் செட்"
+  },
+  {
+    "id": "saree-fall",
+    "name": "Saree Fall & Pico",
+    "price": 200.0,
+    "unit": "saree",
+    "category": "Women",
+    "image": "/static/images/saree-fall.jpg",
+    "name_ta": "சேரி பால் & பிக்கோ"
+  },
+  {
+    "id": "pants",
+    "name": "Pants / Trouser",
+    "price": 280.0,
+    "unit": "piece",
+    "category": "Unisex",
+    "image": "/static/images/pants.jpg",
+    "name_ta": "பேண்ட்"
+  },
+  {
+    "id": "shirt",
+    "name": "Men's Shirt",
+    "price": 400.0,
+    "unit": "piece",
+    "category": "Men",
+    "image": "https://images.unsplash.com/photo-1602810318383-e386cc2a3ccf?w=400&h=400&fit=crop",
+    "name_ta": "சட்டை"
+  },
+  {
+    "id": "alteration",
+    "name": "Alteration",
+    "price": 150.0,
+    "unit": "item",
+    "category": "Service",
+    "image": "/static/images/alteration.jpg",
+    "name_ta": "அல்டரேஷன்"
+  },
+  {
+    "id": "kids",
+    "name": "Kids Dress",
+    "price": 320.0,
+    "unit": "piece",
+    "category": "Kids",
+    "image": "https://images.unsplash.com/photo-1515488042361-ee00e0ddd4e4?w=400&h=400&fit=crop",
+    "name_ta": "குழந்தை உடை"
+  },
+  {
+    "id": "lehenga",
+    "name": "Lehenga Work",
+    "price": 2500.0,
+    "unit": "set",
+    "category": "Women",
+    "image": "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=400&h=400&fit=crop",
+    "name_ta": "லெஹங்கா"
+  }
+]
