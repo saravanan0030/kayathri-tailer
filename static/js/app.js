@@ -514,15 +514,21 @@
 
     try {
       const res = await fetch("/api/products");
-      if (!res.ok) throw new Error("Failed to load");
+      if (!res.ok) throw new Error("Failed to load /api/products");
       state.products = await res.json();
     } catch (e) {
-      if (els.grid && els.loading) {
-        els.loading.remove();
-        els.grid.innerHTML =
-          '<div class="col-12 alert alert-danger">Could not load price list. Run the Python server and refresh.</div>';
+      try {
+        const fallback = await fetch("/data/products.json");
+        if (!fallback.ok) throw new Error("Failed to load /data/products.json");
+        state.products = await fallback.json();
+      } catch (fallbackError) {
+        if (els.grid && els.loading) {
+          els.loading.remove();
+          els.grid.innerHTML =
+            '<div class="col-12 alert alert-danger">Could not load price list. Run the Python server and refresh.</div>';
+        }
+        return;
       }
-      return;
     }
 
     if (els.loading) els.loading.remove();

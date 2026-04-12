@@ -5,3 +5,9 @@
 
 [build.environment]
   PYTHON_VERSION = "3.9"
+
+[[redirects]]
+  from = "/api/products"
+  to = "/.netlify/functions/products"
+  status = 200
+  force = true

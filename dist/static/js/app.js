@@ -5,7 +5,6 @@
     products: [],
     quantities: {},
     filter: "all",
-    billHistory: [],
   };
 
   const els = {
@@ -56,53 +55,6 @@
     const d = new Date();
     if (els.heroDate) els.heroDate.textContent = formatDate(d);
     if (els.billDate) els.billDate.textContent = formatDate(d);
-  }
-
-  function loadBillHistory() {
-    const stored = localStorage.getItem("billHistory");
-    if (stored) {
-      try {
-        state.billHistory = JSON.parse(stored);
-      } catch (e) {
-        state.billHistory = [];
-      }
-    }
-  }
-
-  function saveBillHistory() {
-    localStorage.setItem("billHistory", JSON.stringify(state.billHistory));
-  }
-
-  function saveCurrentBillToHistory() {
-    const billItems = [];
-    let total = 0;
-    for (const id in state.quantities) {
-      const qty = state.quantities[id];
-      if (qty > 0) {
-        const product = state.products.find(p => p.id === id);
-        if (product) {
-          const itemTotal = qty * product.price;
-          total += itemTotal;
-          billItems.push({
-            id: product.id,
-            name: product.name,
-            price: product.price,
-            unit: product.unit,
-            quantity: qty,
-            total: itemTotal,
-          });
-        }
-      }
-    }
-    if (billItems.length > 0) {
-      const bill = {
-        date: new Date().toISOString(),
-        items: billItems,
-        grandTotal: total,
-      };
-      state.billHistory.push(bill);
-      saveBillHistory();
-    }
   }
 
   function getQty(id) {
@@ -383,7 +335,7 @@
     if (!els.ownerSaveBtn) return;
     els.ownerSaveBtn.disabled = true;
     try {
-      const res = await fetch("/.netlify/functions/save-products", {
+      const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pin: pin, products: products }),
@@ -396,7 +348,7 @@
         return;
       }
       showOwnerAlert("Prices saved. The list is updated.", "ok");
-      const reload = await fetch("/.netlify/functions/products");
+      const reload = await fetch("/api/products");
       if (reload.ok) {
         state.products = await reload.json();
         renderGrid();
@@ -511,7 +463,7 @@
     }
     if (els.historyLoadBtn) els.historyLoadBtn.disabled = true;
     try {
-      const res = await fetch("/.netlify/functions/price-history?pin=" + encodeURIComponent(pin));
+      const res = await fetch("/api/price-history?pin=" + encodeURIComponent(pin));
       const data = await res.json().catch(function () {
         return {};
       });
@@ -553,28 +505,30 @@
   }
 
   async function init() {
-    loadBillHistory();
     setDates();
     bindFilters();
     bindOwnerModal();
     bindHistoryModal();
     if (els.btnClear) els.btnClear.addEventListener("click", clearAll);
-    if (els.btnPrint) els.btnPrint.addEventListener("click", () => {
-      saveCurrentBillToHistory();
-      window.print();
-    });
+    if (els.btnPrint) els.btnPrint.addEventListener("click", () => window.print());
 
     try {
-      const res = await fetch("/.netlify/functions/products");
-      if (!res.ok) throw new Error("Failed to load");
+      const res = await fetch("/api/products");
+      if (!res.ok) throw new Error("Failed to load /api/products");
       state.products = await res.json();
     } catch (e) {
-      if (els.grid && els.loading) {
-        els.loading.remove();
-        els.grid.innerHTML =
-          '<div class="col-12 alert alert-danger">Could not load price list. Run the Python server and refresh.</div>';
+      try {
+        const fallback = await fetch("/data/products.json");
+        if (!fallback.ok) throw new Error("Failed to load /data/products.json");
+        state.products = await fallback.json();
+      } catch (fallbackError) {
+        if (els.grid && els.loading) {
+          els.loading.remove();
+          els.grid.innerHTML =
+            '<div class="col-12 alert alert-danger">Could not load price list. Run the Python server and refresh.</div>';
+        }
+        return;
       }
-      return;
     }
 
     if (els.loading) els.loading.remove();
