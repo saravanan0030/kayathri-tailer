@@ -11,3 +11,8 @@
   to = "/.netlify/functions/products/:splat"
   status = 200
   force = true
+
+[[redirects]]
+  from = "/data/*"
+  to = "/data/:splat"
+  status = 200

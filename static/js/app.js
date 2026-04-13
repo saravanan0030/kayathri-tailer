@@ -755,12 +755,13 @@
       
       // Load price history
       const serverEntries = await syncPriceHistoryFromServer(pin);
-      const serverBills = await loadBillsFromServer(pin);
       
       if (serverEntries === null) {
-        showHistoryAlert("Wrong PIN or could not reach server.", "err");
+        showHistoryAlert("Wrong PIN. The default PIN is 1234. Check with the owner.", "err");
         return;
       }
+      
+      const serverBills = await loadBillsFromServer(pin);
       
       const localEntries = loadLocalHistory();
       const mergedEntries = mergeHistories(serverEntries, localEntries);
@@ -772,7 +773,7 @@
       persistLocalBillHistory(mergedBills);
       
       if (mergedEntries.length === 0 && mergedBills.length === 0) {
-        showHistoryAlert("No history found.", "err");
+        showHistoryAlert("No history found. Print a bill or update prices to start recording.", "err");
         if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
         return;
       }
@@ -842,9 +843,9 @@
           });
         });
       }
-      showHistoryAlert("History loaded and synced from server.", "ok");
+      showHistoryAlert("Synced with server successfully!", "ok");
     } catch (e) {
-      showHistoryAlert("Could not load history: " + e.message, "err");
+      showHistoryAlert("Error: " + e.message, "err");
     } finally {
       if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
     }
@@ -863,11 +864,19 @@
 
   async function syncPriceHistoryFromServer(pin) {
     try {
-      const res = await fetch("/api/price-history?pin=" + encodeURIComponent(pin));
-      if (!res.ok) return null;
+      const url = "/api/price-history?pin=" + encodeURIComponent(pin);
+      console.log("Fetching price history from:", url);
+      const res = await fetch(url);
+      console.log("Price history response status:", res.status);
+      if (!res.ok) {
+        console.error("Price history error:", res.statusText);
+        return null;
+      }
       const data = await res.json();
+      console.log("Price history data:", data);
       return data.entries || [];
     } catch (e) {
+      console.error("Price history fetch error:", e);
       return null;
     }
   }

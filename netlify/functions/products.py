@@ -12,15 +12,22 @@ OWNER_PIN = os.environ.get("OWNER_PIN", "1234")
 
 
 def load_products():
-    with open(PRODUCTS_FILE, encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(PRODUCTS_FILE, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        # Return empty product list if file doesn't exist
+        return []
 
 
 def load_history():
     if not HISTORY_FILE.exists():
         return {"entries": []}
-    with open(HISTORY_FILE, encoding="utf-8") as f:
-        data = json.load(f)
+    try:
+        with open(HISTORY_FILE, encoding="utf-8") as f:
+            data = json.load(f)
+    except Exception:
+        return {"entries": []}
     if not isinstance(data, dict):
         return {"entries": []}
     entries = data.get("entries")
@@ -141,20 +148,93 @@ def make_response(body, status=200):
 
 
 def handler(event, context):
+    # Get the path - Netlify passes it differently
     path = event.get("path") or event.get("rawPath") or event.get("resource") or ""
-    method = event.get("httpMethod", "GET")
+    method = event.get("httpMethod") or event.get("requestContext", {}).get("httpMethod") or "GET"
+    
     if not path:
         path = event.get("headers", {}).get("x-incoming-url", "")
-
-    if path.endswith("/price-history"):
+    
+    # Clean up path - remove leading slashes and .netlify/functions/products prefix
+    path = path.lstrip("/")
+    if path.startswith("api/"):
+        path = "/" + path
+    if not path.startswith("/"):
+        path = "/" + path
+    
+    # Health check endpoint
+    if "health" in path or path == "/" or path == "":
+        return make_response({"ok": True, "status": "running", "owner_pin_set": OWNER_PIN != "1234"})
+    
+    # Handle price-history
+    if "price-history" in path:
         params = event.get("queryStringParameters") or {}
         pin = params.get("pin", "")
+        
+        # Debug: check if PIN matches
         if pin != OWNER_PIN:
-            return make_response({"ok": False, "error": "Wrong PIN."}, 403)
-        data = load_history()
-        return make_response({"ok": True, "entries": data.get("entries", []), "retain_days": HISTORY_RETAIN_DAYS})
+            return make_response({
+                "ok": False, 
+                "error": "Wrong PIN. Please try again." if pin else "PIN required.",
+                "serverRunning": True
+            }, 403)
+        
+        try:
+            data = load_history()
+            return make_response({"ok": True, "entries": data.get("entries", []), "retain_days": HISTORY_RETAIN_DAYS})
+        except Exception as e:
+            return make_response({"ok": False, "error": "Could not read history: " + str(e)}, 500)
 
-    if path.endswith("/products"):
+    # Handle bill-history
+    if "bill-history" in path:
+        params = event.get("queryStringParameters") or {}
+        pin = params.get("pin", "")
+        
+        # Handle DELETE
+        if method == "DELETE":
+            if pin != OWNER_PIN:
+                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
+            bill_id = path.split("/bill-history/")[-1] if "/bill-history/" in path else ""
+            if not bill_id or bill_id == "bill-history":
+                return make_response({"ok": False, "error": "Bill ID required."}, 400)
+            data = load_bills()
+            entries = data.get("entries", [])
+            entries = [e for e in entries if e.get("id") != bill_id]
+            try:
+                data["entries"] = entries
+                save_bills_atomic(data)
+                return make_response({"ok": True})
+            except OSError as e:
+                return make_response({"ok": False, "error": str(e)}, 500)
+        
+        # Handle GET
+        if method == "GET":
+            if pin != OWNER_PIN:
+                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
+            data = load_bills()
+            return make_response({"ok": True, "entries": data.get("entries", [])})
+        
+        # Handle POST
+        if method == "POST":
+            try:
+                body = json.loads(event.get("body") or "{}")
+            except Exception:
+                body = {}
+            pin = body.get("pin", "")
+            if pin != OWNER_PIN:
+                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
+            bills = body.get("bills")
+            if not isinstance(bills, list):
+                return make_response({"ok": False, "error": "Bills must be an array."}, 400)
+            try:
+                data = {"entries": bills}
+                save_bills_atomic(data)
+                return make_response({"ok": True})
+            except OSError as e:
+                return make_response({"ok": False, "error": str(e)}, 500)
+
+    # Handle products
+    if "products" in path:
         if method == "POST":
             try:
                 body = json.loads(event.get("body") or "{}")
@@ -195,51 +275,5 @@ def handler(event, context):
             return make_response(load_products())
         except Exception as e:
             return make_response({"ok": False, "error": str(e)}, 500)
-
-    if path.endswith("/bill-history") or "/bill-history/" in path:
-        params = event.get("queryStringParameters") or {}
-        pin = params.get("pin", "")
-        
-        # Handle DELETE /bill-history/{bill_id}
-        if method == "DELETE":
-            if pin != OWNER_PIN:
-                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
-            # Extract bill_id from path
-            bill_id = path.split("/bill-history/")[-1] if "/bill-history/" in path else ""
-            if not bill_id:
-                return make_response({"ok": False, "error": "Bill ID required."}, 400)
-            data = load_bills()
-            entries = data.get("entries", [])
-            entries = [e for e in entries if e.get("id") != bill_id]
-            try:
-                data["entries"] = entries
-                save_bills_atomic(data)
-                return make_response({"ok": True})
-            except OSError as e:
-                return make_response({"ok": False, "error": str(e)}, 500)
-        
-        if method == "GET":
-            if pin != OWNER_PIN:
-                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
-            data = load_bills()
-            return make_response({"ok": True, "entries": data.get("entries", [])})
-        
-        if method == "POST":
-            try:
-                body = json.loads(event.get("body") or "{}")
-            except Exception:
-                body = {}
-            pin = body.get("pin", "")
-            if pin != OWNER_PIN:
-                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
-            bills = body.get("bills")
-            if not isinstance(bills, list):
-                return make_response({"ok": False, "error": "Bills must be an array."}, 400)
-            try:
-                data = {"entries": bills}
-                save_bills_atomic(data)
-                return make_response({"ok": True})
-            except OSError as e:
-                return make_response({"ok": False, "error": str(e)}, 500)
 
     return make_response({"ok": False, "error": "Not found."}, 404)

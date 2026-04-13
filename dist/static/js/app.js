@@ -511,6 +511,15 @@
         }, {})
       );
       addLocalPriceHistory(products);
+      
+      // Sync price history from server to ensure all devices see the changes
+      const serverEntries = await syncPriceHistoryFromServer(pin);
+      if (serverEntries) {
+        const localEntries = loadLocalHistory();
+        const mergedEntries = mergeHistories(serverEntries, localEntries);
+        persistLocalHistory(mergedEntries);
+      }
+      
       const reload = await fetch("/api/products");
       if (reload.ok) {
         state.products = mergeLocalProductEdits(await reload.json());
@@ -571,14 +580,63 @@
     });
     if (billItems.length === 0) return;
     const { grand } = computeTotals();
+    const now = new Date();
     const billEntry = {
-      ts: new Date().toISOString(),
+      id: "bill-" + now.getTime(),
+      ts: now.toISOString(),
       items: billItems,
       total: grand
     };
     const bills = loadLocalBillHistory();
     bills.unshift(billEntry);
     persistLocalBillHistory(bills);
+    
+    // Try to sync bills to server (fire and forget)
+    syncBillsToServer(bills);
+  }
+  
+  async function syncBillsToServer(bills) {
+    try {
+      const ownerPin = els.ownerPin ? els.ownerPin.value.trim() : localStorage.getItem("ownerPin") || "";
+      if (!ownerPin) return;
+      await fetch("/api/bill-history", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin: ownerPin, bills: bills }),
+      });
+    } catch (e) {
+      // Silently fail - bill is saved locally
+    }
+  }
+  
+  async function loadBillsFromServer(pin) {
+    try {
+      const res = await fetch("/api/bill-history?pin=" + encodeURIComponent(pin));
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.entries || [];
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  function mergeBills(serverBills, localBills) {
+    if (!serverBills) serverBills = [];
+    if (!localBills) localBills = [];
+    const merged = [...(serverBills || [])];
+    const serverIds = new Set(merged.map(b => b.id));
+    localBills.forEach(function (bill) {
+      if (!serverIds.has(bill.id)) {
+        merged.push(bill);
+      }
+    });
+    return merged.sort(function (a, b) {
+      try {
+        return new Date(b.ts) - new Date(a.ts);
+      } catch (e) {
+        return 0;
+      }
+    });
   }
 
   function printBillEntry(entry) {
@@ -692,19 +750,154 @@
     }
     if (els.historyLoadBtn) els.historyLoadBtn.disabled = true;
     try {
-      // For now, load local bill history
-      const localBills = loadLocalBillHistory();
-      if (localBills.length > 0) {
-        showHistoryAlert("Showing stored bill history.", "ok");
-        renderHistoryEntries(localBills);
+      // Store PIN for auto-sync when saving bills
+      localStorage.setItem("ownerPin", pin);
+      
+      // Load price history
+      const serverEntries = await syncPriceHistoryFromServer(pin);
+      
+      if (serverEntries === null) {
+        showHistoryAlert("Wrong PIN. The default PIN is 1234. Check with the owner.", "err");
         return;
       }
-      showHistoryAlert("No bill history found.", "err");
+      
+      const serverBills = await loadBillsFromServer(pin);
+      
+      const localEntries = loadLocalHistory();
+      const mergedEntries = mergeHistories(serverEntries, localEntries);
+      persistLocalHistory(mergedEntries);
+      
+      // Merge bills
+      const localBills = loadLocalBillHistory();
+      const mergedBills = serverBills ? mergeBills(serverBills, localBills) : localBills;
+      persistLocalBillHistory(mergedBills);
+      
+      if (mergedEntries.length === 0 && mergedBills.length === 0) {
+        showHistoryAlert("No history found. Print a bill or update prices to start recording.", "err");
+        if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
+        return;
+      }
+      
+      // Display tabs for price history and bills
+      let html = '<div class="mb-3"><ul class="nav nav-tabs" role="tablist">';
+      if (mergedBills.length > 0) {
+        html += '<li class="nav-item"><a class="nav-link active" href="#billTab" data-bs-toggle="tab">Bills (' + mergedBills.length + ')</a></li>';
+        html += '<li class="nav-item"><a class="nav-link" href="#priceTab" data-bs-toggle="tab">Price History (' + mergedEntries.length + ')</a></li>';
+      } else {
+        html += '<li class="nav-item"><a class="nav-link active" href="#priceTab" data-bs-toggle="tab">Price History</a></li>';
+      }
+      html += '</ul><div class="tab-content">';
+      
+      // Bills tab
+      if (mergedBills.length > 0) {
+        html += '<div id="billTab" class="tab-pane fade show active"><div style="max-height: 500px; overflow-y: auto;">';
+        mergedBills.forEach(function (bill) {
+          const d = new Date(bill.ts);
+          const dateStr = d.toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
+          const billId = bill.id || "unknown";
+          html += '<div style="border-bottom: 1px solid #ddd; padding: 10px 0; margin-bottom: 10px;">';
+          html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+          html += '<strong>' + escapeHtml(dateStr) + ' - Total: ' + formatMoney(bill.total || 0) + '</strong>';
+          html += '<span style="display: flex; gap: 5px;">';
+          html += '<button class="btn btn-sm btn-outline-info print-bill-btn" data-billid="' + escapeAttr(billId) + '" style="padding: 2px 8px; font-size: 12px;">Print</button>';
+          html += '<button class="btn btn-sm btn-outline-danger delete-bill-btn" data-billid="' + escapeAttr(billId) + '" style="padding: 2px 8px; font-size: 12px;">Delete</button>';
+          html += '</span></div>';
+          html += '<small style="color: #666;">Items: ' + (bill.items || []).length + '</small>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      }
+      
+      // Price history tab
+      html += '<div id="priceTab" class="tab-pane fade ' + (mergedBills.length === 0 ? 'show active' : '') + '"><div style="max-height: 500px; overflow-y: auto;"><table class="table table-sm table-hover"><thead><tr><th>Date</th><th>Product</th><th>Price</th></tr></thead><tbody>';
+      mergedEntries.forEach(function (entry) {
+        const d = new Date(entry.ts);
+        const dateStr = d.toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
+        const prices = entry.prices || {};
+        const names = entry.names || {};
+        Object.keys(prices).forEach(function (id) {
+          html += '<tr><td>' + escapeHtml(dateStr) + '</td><td>' + escapeHtml(names[id] || id) + '</td><td class="text-end">' + formatMoney(prices[id]) + '</td></tr>';
+        });
+      });
+      html += '</tbody></table></div></div></div></div>';
+      
+      if (els.historyContent) {
+        els.historyContent.innerHTML = html;
+        // Bind print buttons
+        document.querySelectorAll('.print-bill-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const billId = this.getAttribute('data-billid');
+            const bill = mergedBills.find(b => b.id === billId);
+            if (bill) printBillEntry(bill);
+          });
+        });
+        // Bind delete buttons
+        document.querySelectorAll('.delete-bill-btn').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            if (!confirm('Delete this bill?')) return;
+            const billId = this.getAttribute('data-billid');
+            await deleteBillFromServer(pin, billId);
+            const updated = mergedBills.filter(b => b.id !== billId);
+            persistLocalBillHistory(updated);
+            loadPriceHistory(); // Refresh view
+          });
+        });
+      }
+      showHistoryAlert("Synced with server successfully!", "ok");
     } catch (e) {
-      showHistoryAlert("Could not load history.", "err");
+      showHistoryAlert("Error: " + e.message, "err");
     } finally {
       if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
     }
+  }
+  
+  async function deleteBillFromServer(pin, billId) {
+    try {
+      await fetch("/api/bill-history/" + encodeURIComponent(billId) + "?pin=" + encodeURIComponent(pin), {
+        method: "DELETE"
+      });
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+
+  async function syncPriceHistoryFromServer(pin) {
+    try {
+      const url = "/api/price-history?pin=" + encodeURIComponent(pin);
+      console.log("Fetching price history from:", url);
+      const res = await fetch(url);
+      console.log("Price history response status:", res.status);
+      if (!res.ok) {
+        console.error("Price history error:", res.statusText);
+        return null;
+      }
+      const data = await res.json();
+      console.log("Price history data:", data);
+      return data.entries || [];
+    } catch (e) {
+      console.error("Price history fetch error:", e);
+      return null;
+    }
+  }
+
+  function mergeHistories(serverEntries, localEntries) {
+    if (!serverEntries) serverEntries = [];
+    if (!localEntries) localEntries = [];
+    const merged = [...(serverEntries || [])];
+    const serverTimestamps = new Set(merged.map(e => e.ts));
+    localEntries.forEach(function (entry) {
+      if (!serverTimestamps.has(entry.ts)) {
+        merged.push(entry);
+      }
+    });
+    return merged.sort(function (a, b) {
+      try {
+        return new Date(b.ts) - new Date(a.ts);
+      } catch (e) {
+        return 0;
+      }
+    });
   }
 
   function bindHistoryModal() {

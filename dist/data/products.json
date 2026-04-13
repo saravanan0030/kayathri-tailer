@@ -2,7 +2,7 @@
   {
     "id": "blouse-normal",
     "name": "Normal blouse",
-    "price": 353.0,
+    "price": 1.0,
     "unit": "piece",
     "category": "Blouse",
     "image": "static/images/blouse-normal.jpg",
