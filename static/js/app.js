@@ -511,6 +511,15 @@
         }, {})
       );
       addLocalPriceHistory(products);
+      
+      // Sync price history from server to ensure all devices see the changes
+      const serverEntries = await syncPriceHistoryFromServer(pin);
+      if (serverEntries) {
+        const localEntries = loadLocalHistory();
+        const mergedEntries = mergeHistories(serverEntries, localEntries);
+        persistLocalHistory(mergedEntries);
+      }
+      
       const reload = await fetch("/api/products");
       if (reload.ok) {
         state.products = mergeLocalProductEdits(await reload.json());
@@ -692,19 +701,69 @@
     }
     if (els.historyLoadBtn) els.historyLoadBtn.disabled = true;
     try {
-      // For now, load local bill history
-      const localBills = loadLocalBillHistory();
-      if (localBills.length > 0) {
-        showHistoryAlert("Showing stored bill history.", "ok");
-        renderHistoryEntries(localBills);
+      const serverEntries = await syncPriceHistoryFromServer(pin);
+      if (serverEntries === null) {
+        showHistoryAlert("Wrong PIN or could not reach server.", "err");
         return;
       }
-      showHistoryAlert("No bill history found.", "err");
+      const localEntries = loadLocalHistory();
+      const mergedEntries = mergeHistories(serverEntries, localEntries);
+      persistLocalHistory(mergedEntries);
+      if (mergedEntries.length > 0) {
+        showHistoryAlert("Price history loaded from server and synced.", "ok");
+        const html = '<div class="table-responsive"><table class="table table-sm table-hover"><thead><tr><th>Date</th><th>Product</th><th>Price</th></tr></thead><tbody>';
+        let rows = '';
+        mergedEntries.forEach(function (entry) {
+          const d = new Date(entry.ts);
+          const dateStr = d.toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
+          const prices = entry.prices || {};
+          const names = entry.names || {};
+          Object.keys(prices).forEach(function (id) {
+            rows += '<tr><td>' + escapeHtml(dateStr) + '</td><td>' + escapeHtml(names[id] || id) + '</td><td class="text-end">' + formatMoney(prices[id]) + '</td></tr>';
+          });
+        });
+        if (els.historyContent) {
+          els.historyContent.innerHTML = html + rows + '</tbody></table></div>';
+        }
+        return;
+      }
+      showHistoryAlert("No price history found.", "err");
     } catch (e) {
-      showHistoryAlert("Could not load history.", "err");
+      showHistoryAlert("Could not load history: " + e.message, "err");
     } finally {
       if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
     }
+  }
+
+
+  async function syncPriceHistoryFromServer(pin) {
+    try {
+      const res = await fetch("/api/price-history?pin=" + encodeURIComponent(pin));
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.entries || [];
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function mergeHistories(serverEntries, localEntries) {
+    if (!serverEntries) serverEntries = [];
+    if (!localEntries) localEntries = [];
+    const merged = [...(serverEntries || [])];
+    const serverTimestamps = new Set(merged.map(e => e.ts));
+    localEntries.forEach(function (entry) {
+      if (!serverTimestamps.has(entry.ts)) {
+        merged.push(entry);
+      }
+    });
+    return merged.sort(function (a, b) {
+      try {
+        return new Date(b.ts) - new Date(a.ts);
+      } catch (e) {
+        return 0;
+      }
+    });
   }
 
   function bindHistoryModal() {
