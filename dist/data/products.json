@@ -5,7 +5,7 @@
     "price": 353.0,
     "unit": "piece",
     "category": "Blouse",
-    "image": "/static/images/blouse-normal.jpg",
+    "image": "static/images/blouse-normal.jpg",
     "name_ta": "சாதாரண ப்ளவுஸ்"
   },
   {
@@ -14,7 +14,7 @@
     "price": 550.0,
     "unit": "piece",
     "category": "Blouse",
-    "image": "/static/images/blouse-designing.jpg",
+    "image": "static/images/blouse-designing.jpg",
     "name_ta": "டிசைன் ப்ளவுஸ்"
   },
   {
@@ -32,7 +32,7 @@
     "price": 650.0,
     "unit": "set",
     "category": "Women",
-    "image": "/static/images/churidar-set.jpg",
+    "image": "static/images/churidar-set.jpg",
     "name_ta": "சுரிதார் / சல்வார் செட்"
   },
   {
@@ -41,7 +41,7 @@
     "price": 200.0,
     "unit": "saree",
     "category": "Women",
-    "image": "/static/images/saree-fall.jpg",
+    "image": "static/images/saree-fall.jpg",
     "name_ta": "சேரி பால் & பிக்கோ"
   },
   {
@@ -50,7 +50,7 @@
     "price": 280.0,
     "unit": "piece",
     "category": "Unisex",
-    "image": "/static/images/pants.jpg",
+    "image": "static/images/pants.jpg",
     "name_ta": "பேண்ட்"
   },
   {
@@ -68,7 +68,7 @@
     "price": 150.0,
     "unit": "item",
     "category": "Service",
-    "image": "/static/images/alteration.jpg",
+    "image": "static/images/alteration.jpg",
     "name_ta": "அல்டரேஷன்"
   },
   {

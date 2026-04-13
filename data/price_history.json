@@ -1,3 +1,58 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "ts": "2026-04-13T02:40:24.464366+00:00",
+      "prices": {
+        "blouse-normal": 1.0,
+        "blouse-designing": 550.0,
+        "old-dress": 400.0,
+        "churidar": 650.0,
+        "saree-fall": 200.0,
+        "pants": 280.0,
+        "shirt": 400.0,
+        "alteration": 150.0,
+        "kids": 320.0,
+        "lehenga": 2500.0
+      },
+      "names": {
+        "blouse-normal": "Normal blouse",
+        "blouse-designing": "Designing blouse",
+        "old-dress": "Old dress",
+        "churidar": "Sudithar set",
+        "saree-fall": "Saree Fall & Pico",
+        "pants": "Pants / Trouser",
+        "shirt": "Men's Shirt",
+        "alteration": "Alteration",
+        "kids": "Kids Dress",
+        "lehenga": "Lehenga Work"
+      }
+    },
+    {
+      "ts": "2026-04-13T02:28:35.615914+00:00",
+      "prices": {
+        "blouse-normal": 352.0,
+        "blouse-designing": 550.0,
+        "old-dress": 400.0,
+        "churidar": 650.0,
+        "saree-fall": 200.0,
+        "pants": 280.0,
+        "shirt": 400.0,
+        "alteration": 150.0,
+        "kids": 320.0,
+        "lehenga": 2500.0
+      },
+      "names": {
+        "blouse-normal": "Normal blouse",
+        "blouse-designing": "Designing blouse",
+        "old-dress": "Old dress",
+        "churidar": "Sudithar set",
+        "saree-fall": "Saree Fall & Pico",
+        "pants": "Pants / Trouser",
+        "shirt": "Men's Shirt",
+        "alteration": "Alteration",
+        "kids": "Kids Dress",
+        "lehenga": "Lehenga Work"
+      }
+    }
+  ]
 }

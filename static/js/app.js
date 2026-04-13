@@ -1,6 +1,13 @@
 (function () {
   "use strict";
 
+  const STORAGE_KEYS = {
+    quantities: "ktb-quantities",
+    productEdits: "ktb-product-edits",
+    history: "ktb-price-history",
+    bills: "ktb-bill-history",
+  };
+
   const state = {
     products: [],
     quantities: {},
@@ -68,15 +75,24 @@
     updateCardLine(id);
     renderBill();
     updateStats();
+    persistQuantities();
   }
 
   function bumpQty(id, delta) {
     setQty(id, getQty(id) + delta);
   }
 
+  const PLACEHOLDER_IMAGE =
+    "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect width='100%25' height='100%25' fill='%23f8f3ee'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial,sans-serif' font-size='22' fill='%23666'%3EImage unavailable%3C/text%3E%3C/svg%3E";
+
   function productCard(p) {
     const q = getQty(p.id);
     const line = q * p.price;
+    const imageSrc = p && p.image
+      ? /^https?:\/\//i.test(p.image) || p.image.startsWith("/")
+        ? p.image
+        : "/" + p.image.replace(/^\.?\//, "")
+      : "";
     return (
       '<div class="col-12 col-sm-6 col-xl-4 product-col" data-category="' +
       escapeAttr(p.category) +
@@ -84,10 +100,12 @@
       '<article class="product-card">' +
       '<div class="ratio ratio-4x3">' +
       '<img src="' +
-      escapeAttr(p.image) +
+      escapeAttr(imageSrc) +
       '" alt="' +
       escapeAttr(p.name) +
-      '" loading="lazy" width="400" height="300">' +
+      '" onerror="this.onerror=null;this.src=\'' +
+      PLACEHOLDER_IMAGE +
+      '\'" loading="lazy" width="400" height="300">' +
       "</div>" +
       '<div class="product-card-body">' +
       '<span class="badge bg-light text-dark border mb-2 align-self-start">' +
@@ -135,6 +153,20 @@
     );
   }
 
+  function renderGrid() {
+    if (!els.grid) return;
+    const filtered = state.products.filter((p) => {
+      return state.filter === "all" || p.category === state.filter;
+    });
+    if (filtered.length === 0) {
+      els.grid.innerHTML =
+        '<div class="col-12 text-center py-5"><div class="alert alert-secondary">No products found for this category.</div></div>';
+      return;
+    }
+    els.grid.innerHTML = filtered.map(productCard).join("");
+    bindQtyButtons();
+  }
+
   function escapeHtml(s) {
     if (s == null) return "";
     const d = document.createElement("div");
@@ -146,17 +178,102 @@
     return escapeHtml(s).replace(/"/g, "&quot;");
   }
 
-  function renderGrid() {
-    if (!els.grid) return;
-    const filtered =
-      state.filter === "all"
-        ? state.products
-        : state.products.filter((p) => p.category === state.filter);
-    const html = filtered.map(productCard).join("");
-    els.grid.innerHTML =
-      html ||
-      '<div class="col-12 text-center text-muted py-5">No items in this category.</div>';
-    bindQtyButtons();
+  function loadFromStorage(key) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveToStorage(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (e) {
+      // ignore storage failures
+    }
+  }
+
+  function loadPersistedQuantities() {
+    const data = loadFromStorage(STORAGE_KEYS.quantities);
+    if (data && typeof data === "object") {
+      state.quantities = data;
+    }
+  }
+
+  function persistQuantities() {
+    saveToStorage(STORAGE_KEYS.quantities, state.quantities);
+  }
+
+  function loadLocalProductEdits() {
+    const data = loadFromStorage(STORAGE_KEYS.productEdits);
+    return data && typeof data === "object" ? data : {};
+  }
+
+  function persistLocalProductEdits(edits) {
+    saveToStorage(STORAGE_KEYS.productEdits, edits || {});
+  }
+
+  function loadLocalHistory() {
+    const data = loadFromStorage(STORAGE_KEYS.history);
+    return Array.isArray(data) ? data : [];
+  }
+
+  function persistLocalHistory(entries) {
+    saveToStorage(STORAGE_KEYS.history, Array.isArray(entries) ? entries : []);
+  }
+
+  function loadLocalBillHistory() {
+    const data = loadFromStorage(STORAGE_KEYS.bills);
+    return Array.isArray(data) ? data : [];
+  }
+
+  function persistLocalBillHistory(entries) {
+    saveToStorage(STORAGE_KEYS.bills, Array.isArray(entries) ? entries : []);
+  }
+
+  function mergeLocalProductEdits(products) {
+    const edits = loadLocalProductEdits();
+    if (!edits || Object.keys(edits).length === 0) return products;
+    return products.map((p) => {
+      if (Object.prototype.hasOwnProperty.call(edits, p.id)) {
+        return Object.assign({}, p, { price: Number(edits[p.id] || p.price) });
+      }
+      return p;
+    });
+  }
+
+  function appendLocalHistoryEntry(normalizedProducts) {
+    const entries = loadLocalHistory();
+    const newPrices = {};
+    const newNames = {};
+    normalizedProducts.forEach((p) => {
+      newPrices[p.id] = Number(p.price);
+      newNames[p.id] = p.name;
+    });
+    const latest = entries[0] || {};
+    if (latest.prices && samePriceObject(latest.prices, newPrices)) {
+      persistLocalHistory(entries);
+      return;
+    }
+    const now = new Date().toISOString();
+    entries.unshift({ ts: now, prices: newPrices, names: newNames });
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 365);
+    const pruned = entries.filter((entry) => {
+      const t = new Date(entry.ts);
+      return !Number.isNaN(t.getTime()) && t >= cutoff;
+    });
+    persistLocalHistory(pruned);
+  }
+
+  function samePriceObject(a, b) {
+    if (!a || !b) return false;
+    const aKeys = Object.keys(a);
+    const bKeys = Object.keys(b);
+    if (aKeys.length !== bKeys.length) return false;
+    return aKeys.every((key) => samePrice(a[key], b[key]));
   }
 
   function bindQtyButtons() {
@@ -240,6 +357,7 @@
     renderGrid();
     renderBill();
     updateStats();
+    persistQuantities();
   }
 
   function bindFilters() {
@@ -324,6 +442,36 @@
     });
   }
 
+  function addLocalPriceHistory(products) {
+    const normalized = products.map((p) => ({
+      id: p.id,
+      name: p.name,
+      price: Number(p.price),
+    }));
+    appendLocalHistoryEntry(normalized);
+  }
+
+  function fallbackLocalSave(products) {
+    const edits = {};
+    products.forEach((p) => {
+      edits[p.id] = Number(p.price);
+    });
+    persistLocalProductEdits(edits);
+    state.products = mergeLocalProductEdits(products);
+    addLocalPriceHistory(products);
+    renderGrid();
+    renderBill();
+    updateStats();
+    showOwnerAlert(
+      "Server save failed, but prices were stored in your browser.",
+      "ok"
+    );
+  }
+
+  function isBackendUnavailable(status) {
+    return status === 404 || status === 0 || status >= 500;
+  }
+
   async function saveOwnerPrices() {
     hideOwnerAlert();
     const pin = els.ownerPin ? els.ownerPin.value.trim() : "";
@@ -343,20 +491,35 @@
       const data = await res.json().catch(function () {
         return {};
       });
-      if (!res.ok || !data.ok) {
+      if (!res.ok) {
+        if (isBackendUnavailable(res.status)) {
+          fallbackLocalSave(products);
+          return;
+        }
+        showOwnerAlert(data.error || "Save failed. Check PIN and try again.", "err");
+        return;
+      }
+      if (!data.ok) {
         showOwnerAlert(data.error || "Save failed. Check PIN and try again.", "err");
         return;
       }
       showOwnerAlert("Prices saved. The list is updated.", "ok");
+      persistLocalProductEdits(
+        products.reduce(function (map, item) {
+          map[item.id] = Number(item.price);
+          return map;
+        }, {})
+      );
+      addLocalPriceHistory(products);
       const reload = await fetch("/api/products");
       if (reload.ok) {
-        state.products = await reload.json();
+        state.products = mergeLocalProductEdits(await reload.json());
         renderGrid();
         renderBill();
         updateStats();
       }
     } catch (e) {
-      showOwnerAlert("Could not reach the server.", "err");
+      fallbackLocalSave(products);
     } finally {
       els.ownerSaveBtn.disabled = false;
     }
@@ -392,16 +555,77 @@
     els.historyAlert.textContent = "";
   }
 
+  function saveCurrentBill() {
+    const billItems = [];
+    state.products.forEach(p => {
+      const q = getQty(p.id);
+      if (q > 0) {
+        billItems.push({
+          id: p.id,
+          name: p.name,
+          price: p.price,
+          quantity: q,
+          total: q * p.price
+        });
+      }
+    });
+    if (billItems.length === 0) return;
+    const { grand } = computeTotals();
+    const billEntry = {
+      ts: new Date().toISOString(),
+      items: billItems,
+      total: grand
+    };
+    const bills = loadLocalBillHistory();
+    bills.unshift(billEntry);
+    persistLocalBillHistory(bills);
+  }
+
+  function printBillEntry(entry) {
+    const items = entry.items || [];
+    let billHtml = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">';
+    billHtml += '<h2 style="text-align: center;">Kayathri Tailor - Bill</h2>';
+    billHtml += '<p><strong>Date:</strong> ' + (new Date(entry.ts).toLocaleString("en-IN")) + '</p>';
+    billHtml += '<table style="width: 100%; border-collapse: collapse;">';
+    billHtml += '<thead><tr><th style="border: 1px solid #ddd; padding: 8px;">Item</th><th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Qty</th><th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Rate</th><th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Amount</th></tr></thead>';
+    billHtml += '<tbody>';
+    items.forEach(item => {
+      billHtml += '<tr><td style="border: 1px solid #ddd; padding: 8px;">' + escapeHtml(item.name) + '</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">' + item.quantity + '</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">' + formatMoney(item.price) + '</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">' + formatMoney(item.total) + '</td></tr>';
+    });
+    billHtml += '</tbody></table>';
+    billHtml += '<p style="text-align: right; font-weight: bold;">Total: ' + formatMoney(entry.total || 0) + '</p>';
+    billHtml += '</div>';
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(billHtml);
+    printWindow.document.close();
+    printWindow.print();
+  }
+
   function renderHistoryEntries(entries) {
     if (!els.historyContent) return;
     if (!entries || entries.length === 0) {
       els.historyContent.innerHTML =
-        '<p class="text-muted mb-0">No history yet. Open <strong>Edit prices</strong>, change any rate, and tap <strong>Save prices</strong> — each save that changes rates is stored here for one year.</p>';
+        '<p class="text-muted mb-0">No bill history yet. Print a bill to start storing data.</p>';
       return;
     }
-    let html = "";
-    entries.forEach(function (entry, index) {
-      const older = entries[index + 1];
+    let html = '<div class="mb-3"><div class="btn-group" role="group">';
+    html += '<button type="button" class="btn btn-outline-secondary active" data-period="all">All</button>';
+    html += '<button type="button" class="btn btn-outline-secondary" data-period="weekly">Weekly</button>';
+    html += '<button type="button" class="btn btn-outline-secondary" data-period="monthly">Monthly</button>';
+    html += '<button type="button" class="btn btn-outline-secondary" data-period="yearly">Yearly</button>';
+    html += '</div></div>';
+    const now = new Date();
+    const filteredEntries = entries.filter(entry => {
+      const entryDate = new Date(entry.ts);
+      const diffTime = now - entryDate;
+      const diffDays = diffTime / (1000 * 60 * 60 * 24);
+      const activePeriod = document.querySelector('[data-period].active')?.getAttribute('data-period') || 'all';
+      if (activePeriod === 'weekly') return diffDays <= 7;
+      if (activePeriod === 'monthly') return diffDays <= 30;
+      if (activePeriod === 'yearly') return diffDays <= 365;
+      return true;
+    });
+    filteredEntries.forEach(function (entry, index) {
       let d;
       try {
         d = new Date(entry.ts);
@@ -411,47 +635,52 @@
       const dateStr = d && !isNaN(d.getTime())
         ? d.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })
         : escapeHtml(String(entry.ts || ""));
-      const prices = entry.prices || {};
-      const names = entry.names || {};
-      const ids = Object.keys(prices).sort(function (a, b) {
-        const na = names[a] || a;
-        const nb = names[b] || b;
-        return String(na).localeCompare(String(nb));
-      });
+      const items = entry.items || [];
       let rows = "";
-      ids.forEach(function (id) {
-        const name = names[id] || id;
-        const p = prices[id];
-        let vs = "—";
-        if (older && older.prices) {
-          if (!Object.prototype.hasOwnProperty.call(older.prices, id)) {
-            vs = "New on this date";
-          } else if (!samePrice(older.prices[id], p)) {
-            vs = "was " + formatMoney(older.prices[id]);
-          }
-        }
+      items.forEach(function (item) {
         rows +=
           "<tr><td>" +
-          escapeHtml(String(name)) +
+          escapeHtml(item.name) +
+          '</td><td class="text-end">' +
+          item.quantity +
+          '</td><td class="text-end">' +
+          formatMoney(item.price) +
           '</td><td class="text-end fw-semibold">' +
-          formatMoney(p) +
-          '</td><td class="text-end text-muted">' +
-          escapeHtml(vs) +
+          formatMoney(item.total) +
           "</td></tr>";
       });
       html +=
         '<section class="history-block">' +
-        '<h3 class="h6 fw-bold text-accent mb-2">' +
+        '<div class="d-flex justify-content-between align-items-center mb-2">' +
+        '<h3 class="h6 fw-bold text-accent mb-0">' +
         escapeHtml(dateStr) +
-        "</h3>" +
+        '</h3>' +
+        '<button type="button" class="btn btn-sm btn-outline-secondary history-print-btn" data-index="' + index + '">Print Bill</button>' +
+        '</div>' +
         '<div class="table-responsive rounded-3 border">' +
         '<table class="table table-sm table-hover mb-0 history-table">' +
-        "<thead><tr><th>Item</th><th class=\"text-end\">Rate</th><th class=\"text-end\">vs previous save</th></tr></thead>" +
+        "<thead><tr><th>Item</th><th class=\"text-end\">Qty</th><th class=\"text-end\">Rate</th><th class=\"text-end\">Amount</th></tr></thead>" +
         "<tbody>" +
         rows +
-        "</tbody></table></div></section>";
+        "</tbody></table></div>" +
+        '<div class="text-end mt-2"><strong>Total: ' + formatMoney(entry.total || 0) + '</strong></div></section>';
     });
     els.historyContent.innerHTML = html;
+    // Bind period filters
+    document.querySelectorAll('[data-period]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.querySelectorAll('[data-period]').forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+        renderHistoryEntries(entries);
+      });
+    });
+    // Bind print buttons
+    document.querySelectorAll('.history-print-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const index = parseInt(this.getAttribute('data-index'), 10);
+        printBillEntry(filteredEntries[index]);
+      });
+    });
   }
 
   async function loadPriceHistory() {
@@ -463,22 +692,16 @@
     }
     if (els.historyLoadBtn) els.historyLoadBtn.disabled = true;
     try {
-      const res = await fetch("/api/price-history?pin=" + encodeURIComponent(pin));
-      const data = await res.json().catch(function () {
-        return {};
-      });
-      if (!res.ok || !data.ok) {
-        showHistoryAlert(data.error || "Could not load history.", "err");
-        if (els.historyContent) els.historyContent.innerHTML = "";
+      // For now, load local bill history
+      const localBills = loadLocalBillHistory();
+      if (localBills.length > 0) {
+        showHistoryAlert("Showing stored bill history.", "ok");
+        renderHistoryEntries(localBills);
         return;
       }
-      showHistoryAlert(
-        "Showing up to " + (data.retain_days || 365) + " days of saved changes.",
-        "ok"
-      );
-      renderHistoryEntries(data.entries || []);
+      showHistoryAlert("No bill history found.", "err");
     } catch (e) {
-      showHistoryAlert("Could not reach the server.", "err");
+      showHistoryAlert("Could not load history.", "err");
     } finally {
       if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
     }
@@ -510,7 +733,10 @@
     bindOwnerModal();
     bindHistoryModal();
     if (els.btnClear) els.btnClear.addEventListener("click", clearAll);
-    if (els.btnPrint) els.btnPrint.addEventListener("click", () => window.print());
+    if (els.btnPrint) els.btnPrint.addEventListener("click", () => {
+      saveCurrentBill();
+      window.print();
+    });
 
     try {
       const res = await fetch("/api/products");
@@ -518,8 +744,8 @@
       state.products = await res.json();
     } catch (e) {
       try {
-        const fallback = await fetch("/data/products.json");
-        if (!fallback.ok) throw new Error("Failed to load /data/products.json");
+        const fallback = await fetch("data/products.json");
+        if (!fallback.ok) throw new Error("Failed to load data/products.json");
         state.products = await fallback.json();
       } catch (fallbackError) {
         if (els.grid && els.loading) {
@@ -530,6 +756,9 @@
         return;
       }
     }
+
+    state.products = mergeLocalProductEdits(state.products);
+    loadPersistedQuantities();
 
     if (els.loading) els.loading.remove();
     renderGrid();
