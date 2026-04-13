@@ -196,9 +196,7 @@ def api_save_products():
 
 @app.get("/api/price-history")
 def api_price_history():
-    pin = request.args.get("pin", "")
-    if not isinstance(pin, str) or pin != OWNER_PIN:
-        return jsonify({"ok": False, "error": "Wrong PIN."}), 403
+    # No PIN required - anyone can view price history
     data = load_history()
     return jsonify({"ok": True, "entries": data.get("entries", []), "retain_days": HISTORY_RETAIN_DAYS})
 

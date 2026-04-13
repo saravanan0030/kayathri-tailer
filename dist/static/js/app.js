@@ -564,6 +564,30 @@
     els.historyAlert.textContent = "";
   }
 
+  function showToastMessage(message, kind = "info") {
+    const existing = document.getElementById("ktb-toast-message");
+    if (existing) {
+      existing.remove();
+    }
+    const toast = document.createElement("div");
+    toast.id = "ktb-toast-message";
+    toast.textContent = message;
+    toast.style.position = "fixed";
+    toast.style.right = "20px";
+    toast.style.bottom = "20px";
+    toast.style.backgroundColor = kind === "ok" ? "#198754" : kind === "err" ? "#dc3545" : "#0d6efd";
+    toast.style.color = "#fff";
+    toast.style.padding = "12px 16px";
+    toast.style.borderRadius = "999px";
+    toast.style.boxShadow = "0 4px 12px rgba(0, 0, 0, 0.12)";
+    toast.style.zIndex = "1080";
+    toast.style.fontSize = "0.95rem";
+    document.body.appendChild(toast);
+    window.setTimeout(() => {
+      toast.remove();
+    }, 3200);
+  }
+
   function saveCurrentBill() {
     const billItems = [];
     state.products.forEach(p => {
@@ -590,14 +614,24 @@
     const bills = loadLocalBillHistory();
     bills.unshift(billEntry);
     persistLocalBillHistory(bills);
-    
+
+    // Store the current price snapshot in price history when a bill is printed.
+    appendLocalHistoryEntry(state.products);
+    showToastMessage("Bill stored and price snapshot saved to history.", "ok");
+    if (document.querySelector("#historyModal.show")) {
+      loadPriceHistory();
+    }
+
     // Try to sync bills to server (fire and forget)
     syncBillsToServer(bills);
   }
   
   async function syncBillsToServer(bills) {
     try {
-      const ownerPin = els.ownerPin ? els.ownerPin.value.trim() : localStorage.getItem("ownerPin") || "";
+      const ownerPin =
+        (els.ownerPin ? els.ownerPin.value.trim() : "") ||
+        (els.historyPin ? els.historyPin.value.trim() : "") ||
+        localStorage.getItem("ownerPin") || "";
       if (!ownerPin) return;
       await fetch("/api/bill-history", {
         method: "POST",
@@ -741,57 +775,150 @@
     });
   }
 
+  function editBill(bill, allBills, priceHistory) {
+    const form = `
+      <div style="max-height: 400px; overflow-y: auto;">
+      <h6>Edit Bill - ${new Date(bill.ts).toLocaleString("en-IN")}</h6>
+      <div id="editBillItems" style="margin-bottom: 15px;">
+    `;
+    
+    let itemsHtml = "";
+    (bill.items || []).forEach((item, idx) => {
+      itemsHtml += `
+        <div style="border: 1px solid #ddd; padding: 10px; margin-bottom: 8px; border-radius: 4px;">
+          <div style="margin-bottom: 8px;">
+            <strong>${escapeHtml(item.name)}</strong>
+            <small style="display: block; color: #666;">ID: ${escapeHtml(item.id)}</small>
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px;">
+            <div>
+              <label style="font-size: 12px;">Qty</label>
+              <input type="number" class="form-control form-control-sm edit-bill-qty" data-idx="${idx}" value="${item.quantity}" min="0">
+            </div>
+            <div>
+              <label style="font-size: 12px;">Rate (₹)</label>
+              <input type="number" class="form-control form-control-sm edit-bill-price" data-idx="${idx}" value="${item.price}" min="0" step="0.01">
+            </div>
+          </div>
+          <small style="color: #666;">Total: ₹${(item.quantity * item.price).toFixed(2)}</small>
+        </div>
+      `;
+    });
+    
+    const saveBtn = `
+      <button class="btn btn-sm btn-primary" id="saveBillChangesBtn" style="margin-top: 10px;">Save Changes</button>
+      <button class="btn btn-sm btn-secondary" id="cancelBillEditBtn" style="margin-top: 10px; margin-left: 5px;">Cancel</button>
+    `;
+    
+    const fullForm = form + itemsHtml + saveBtn + '</div></div>';
+    
+    if (els.historyContent) {
+      els.historyContent.innerHTML = fullForm;
+      
+      document.getElementById('saveBillChangesBtn').addEventListener('click', function() {
+        const updatedItems = (bill.items || []).map((item, idx) => {
+          const newQty = parseInt(document.querySelector(`.edit-bill-qty[data-idx="${idx}"]`).value, 10) || 0;
+          const newPrice = parseFloat(document.querySelector(`.edit-bill-price[data-idx="${idx}"]`).value) || 0;
+          return {
+            ...item,
+            quantity: newQty,
+            price: newPrice,
+            total: newQty * newPrice
+          };
+        }).filter((item) => item.quantity > 0);
+        
+        if (updatedItems.length === 0) {
+          showHistoryAlert("Cannot save an empty bill. Keep at least one item.", "err");
+          return;
+        }
+        
+        const updatedBill = {
+          ...bill,
+          items: updatedItems,
+          total: updatedItems.reduce((sum, item) => sum + (item.total || 0), 0)
+        };
+        
+        const billIdx = allBills.findIndex(b => b.id === bill.id);
+        if (billIdx >= 0) {
+          allBills[billIdx] = updatedBill;
+          persistLocalBillHistory(allBills);
+          syncBillsToServer(allBills);
+          showHistoryAlert("✓ Bill updated successfully", "ok");
+          setTimeout(() => loadPriceHistory(), 500);
+        }
+      });
+      
+      document.getElementById('cancelBillEditBtn').addEventListener('click', function() {
+        loadPriceHistory();
+      });
+    }
+  }
+  
+  function editPrice(entry, productId, allEntries) {
+    const productName = entry.names && entry.names[productId] ? entry.names[productId] : productId;
+    const currentPrice = entry.prices && entry.prices[productId] ? entry.prices[productId] : 0;
+    
+    const form = `
+      <div style="max-width: 400px;">
+      <h6>Edit Price - ${escapeHtml(productName)}</h6>
+      <div style="margin-bottom: 15px;">
+        <label style="display: block; margin-bottom: 5px;">Product: <strong>${escapeHtml(productName)}</strong></label>
+        <label style="display: block; margin-bottom: 5px;">Date: ${new Date(entry.ts).toLocaleString("en-IN")}</label>
+        <label style="display: block; margin-bottom: 5px;">Current Price: ₹${currentPrice.toFixed(2)}</label>
+        <label style="display: block; margin-bottom: 5px; margin-top: 15px;">New Price (₹)</label>
+        <input type="number" id="editPriceInput" class="form-control" value="${currentPrice}" min="0" step="0.01" style="margin-bottom: 15px;">
+        <button class="btn btn-sm btn-primary" id="savePriceChangesBtn">Save</button>
+        <button class="btn btn-sm btn-secondary" id="cancelPriceEditBtn" style="margin-left: 5px;">Cancel</button>
+      </div>
+      </div>
+    `;
+    
+    if (els.historyContent) {
+      els.historyContent.innerHTML = form;
+      
+      document.getElementById('savePriceChangesBtn').addEventListener('click', function() {
+        const newPrice = parseFloat(document.getElementById('editPriceInput').value) || 0;
+        
+        if (entry.prices) entry.prices[productId] = newPrice;
+        persistLocalHistory(allEntries);
+        showHistoryAlert("✓ Price updated successfully", "ok");
+        setTimeout(() => loadPriceHistory(), 500);
+      });
+      
+      document.getElementById('cancelPriceEditBtn').addEventListener('click', function() {
+        loadPriceHistory();
+      });
+    }
+  }
+
   async function loadPriceHistory() {
     hideHistoryAlert();
-    const pin = els.historyPin ? els.historyPin.value.trim() : "";
-    if (!pin) {
-      showHistoryAlert("Enter your owner PIN.", "err");
-      return;
-    }
     if (els.historyLoadBtn) els.historyLoadBtn.disabled = true;
     try {
-      // Store PIN for auto-sync when saving bills
-      localStorage.setItem("ownerPin", pin);
-      
-      // Load price history
-      const serverEntries = await syncPriceHistoryFromServer(pin);
-      
-      if (serverEntries === null) {
-        showHistoryAlert("Wrong PIN. The default PIN is 1234. Check with the owner.", "err");
-        return;
-      }
-      
-      const serverBills = await loadBillsFromServer(pin);
-      
+      const pin = els.historyPin ? els.historyPin.value.trim() : "";
+      // Load price history (no PIN required)
+      const serverEntries = await syncPriceHistoryFromServer("");
+
       const localEntries = loadLocalHistory();
       const mergedEntries = mergeHistories(serverEntries, localEntries);
       persistLocalHistory(mergedEntries);
-      
-      // Merge bills
-      const localBills = loadLocalBillHistory();
-      const mergedBills = serverBills ? mergeBills(serverBills, localBills) : localBills;
-      persistLocalBillHistory(mergedBills);
-      
-      if (mergedEntries.length === 0 && mergedBills.length === 0) {
-        showHistoryAlert("No history found. Print a bill or update prices to start recording.", "err");
+
+      const localBillHistory = loadLocalBillHistory();
+      const serverBills = pin ? await loadBillsFromServer(pin) : null;
+      const bills = mergeBills(serverBills, localBillHistory);
+
+      if (mergedEntries.length === 0 && bills.length === 0) {
+        showHistoryAlert("No history yet. Print a bill to start storing data.", "err");
         if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
         return;
       }
       
-      // Display tabs for price history and bills
-      let html = '<div class="mb-3"><ul class="nav nav-tabs" role="tablist">';
-      if (mergedBills.length > 0) {
-        html += '<li class="nav-item"><a class="nav-link active" href="#billTab" data-bs-toggle="tab">Bills (' + mergedBills.length + ')</a></li>';
-        html += '<li class="nav-item"><a class="nav-link" href="#priceTab" data-bs-toggle="tab">Price History (' + mergedEntries.length + ')</a></li>';
+      // Display only bills
+      let html = '<div style="max-height: 500px; overflow-y: auto;">';
+      if (bills.length === 0) {
+        html += '<p class="text-muted mb-0">No bills yet. Print a bill to start storing data.</p>';
       } else {
-        html += '<li class="nav-item"><a class="nav-link active" href="#priceTab" data-bs-toggle="tab">Price History</a></li>';
-      }
-      html += '</ul><div class="tab-content">';
-      
-      // Bills tab
-      if (mergedBills.length > 0) {
-        html += '<div id="billTab" class="tab-pane fade show active"><div style="max-height: 500px; overflow-y: auto;">';
-        mergedBills.forEach(function (bill) {
+        bills.forEach(function (bill) {
           const d = new Date(bill.ts);
           const dateStr = d.toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
           const billId = bill.id || "unknown";
@@ -800,26 +927,13 @@
           html += '<strong>' + escapeHtml(dateStr) + ' - Total: ' + formatMoney(bill.total || 0) + '</strong>';
           html += '<span style="display: flex; gap: 5px;">';
           html += '<button class="btn btn-sm btn-outline-info print-bill-btn" data-billid="' + escapeAttr(billId) + '" style="padding: 2px 8px; font-size: 12px;">Print</button>';
-          html += '<button class="btn btn-sm btn-outline-danger delete-bill-btn" data-billid="' + escapeAttr(billId) + '" style="padding: 2px 8px; font-size: 12px;">Delete</button>';
+          html += '<button class="btn btn-sm btn-outline-warning edit-bill-btn" data-billid="' + escapeAttr(billId) + '" style="padding: 2px 8px; font-size: 12px;">Edit</button>';
           html += '</span></div>';
           html += '<small style="color: #666;">Items: ' + (bill.items || []).length + '</small>';
           html += '</div>';
         });
-        html += '</div></div>';
       }
-      
-      // Price history tab
-      html += '<div id="priceTab" class="tab-pane fade ' + (mergedBills.length === 0 ? 'show active' : '') + '"><div style="max-height: 500px; overflow-y: auto;"><table class="table table-sm table-hover"><thead><tr><th>Date</th><th>Product</th><th>Price</th></tr></thead><tbody>';
-      mergedEntries.forEach(function (entry) {
-        const d = new Date(entry.ts);
-        const dateStr = d.toLocaleString("en-IN", { dateStyle: "short", timeStyle: "short" });
-        const prices = entry.prices || {};
-        const names = entry.names || {};
-        Object.keys(prices).forEach(function (id) {
-          html += '<tr><td>' + escapeHtml(dateStr) + '</td><td>' + escapeHtml(names[id] || id) + '</td><td class="text-end">' + formatMoney(prices[id]) + '</td></tr>';
-        });
-      });
-      html += '</tbody></table></div></div></div></div>';
+      html += '</div>';
       
       if (els.historyContent) {
         els.historyContent.innerHTML = html;
@@ -827,25 +941,23 @@
         document.querySelectorAll('.print-bill-btn').forEach(btn => {
           btn.addEventListener('click', function() {
             const billId = this.getAttribute('data-billid');
-            const bill = mergedBills.find(b => b.id === billId);
+            const bill = bills.find(b => b.id === billId);
             if (bill) printBillEntry(bill);
           });
         });
-        // Bind delete buttons
-        document.querySelectorAll('.delete-bill-btn').forEach(btn => {
-          btn.addEventListener('click', async function() {
-            if (!confirm('Delete this bill?')) return;
+        // Bind edit bill buttons
+        document.querySelectorAll('.edit-bill-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
             const billId = this.getAttribute('data-billid');
-            await deleteBillFromServer(pin, billId);
-            const updated = mergedBills.filter(b => b.id !== billId);
-            persistLocalBillHistory(updated);
-            loadPriceHistory(); // Refresh view
+            const bill = bills.find(b => b.id === billId);
+            if (bill) editBill(bill, bills, mergedEntries);
           });
         });
       }
-      showHistoryAlert("Synced with server successfully!", "ok");
+      showHistoryAlert("✓ Bill history loaded", "ok");
     } catch (e) {
-      showHistoryAlert("Error: " + e.message, "err");
+      console.error("History error:", e);
+      showHistoryAlert("Error loading history", "err");
     } finally {
       if (els.historyLoadBtn) els.historyLoadBtn.disabled = false;
     }
@@ -906,7 +1018,7 @@
         hideHistoryAlert();
         if (els.historyContent) {
           els.historyContent.innerHTML =
-            '<p class="text-muted mb-0">Enter PIN and tap <strong>Load history</strong>.</p>';
+            '<p class="text-muted mb-0">Tap <strong>Load history</strong> to view bill records.</p>';
         }
         if (els.historyPin) els.historyPin.focus();
       });

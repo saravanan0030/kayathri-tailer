@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "id": "bill-1776051826229",
+      "ts": "2026-04-13T03:43:46.229Z",
+      "items": [
+        {
+          "id": "blouse-normal",
+          "name": "Normal blouse",
+          "price": 1,
+          "quantity": 1,
+          "total": 1
+        }
+      ],
+      "total": 1
+    }
+  ]
+}

@@ -168,17 +168,7 @@ def handler(event, context):
     
     # Handle price-history
     if "price-history" in path:
-        params = event.get("queryStringParameters") or {}
-        pin = params.get("pin", "")
-        
-        # Debug: check if PIN matches
-        if pin != OWNER_PIN:
-            return make_response({
-                "ok": False, 
-                "error": "Wrong PIN. Please try again." if pin else "PIN required.",
-                "serverRunning": True
-            }, 403)
-        
+        # No PIN required - anyone can view price history
         try:
             data = load_history()
             return make_response({"ok": True, "entries": data.get("entries", []), "retain_days": HISTORY_RETAIN_DAYS})

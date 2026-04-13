@@ -2,7 +2,32 @@
 
 This is a billing web app for Kayathri Tailor.
 
+## Features
+
+### Billing
+- Select products and quantities
+- Calculate totals automatically
+- Print bills (saves bill data to history)
+
+### Price Management
+- Owner can update product prices (requires PIN)
+- Price changes are automatically saved to price history
+
+### History
+- **Bill History**: View all printed bills with details (requires PIN for server data)
+
+## How to Use Bill History
+
+1. Print a bill (this automatically saves the bill to history)
+2. Click "Bill history" in the menu
+3. Enter owner PIN (default: 1234) to load server data
+4. Click "Load history"
+5. View all printed bills with date, total, and items
+6. Click "Print" to reprint any bill
+7. Click "Edit" to modify bill details
+
 ## Deployment on Netlify
+
 
 ### Quick Start (Default PIN: 1234)
 
