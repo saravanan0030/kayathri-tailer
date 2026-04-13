@@ -9,6 +9,7 @@ from flask import Flask, jsonify, render_template, request
 BASE_DIR = Path(__file__).resolve().parent
 PRODUCTS_FILE = BASE_DIR / "data" / "products.json"
 HISTORY_FILE = BASE_DIR / "data" / "price_history.json"
+BILLS_FILE = BASE_DIR / "data" / "bills.json"
 HISTORY_RETAIN_DAYS = 365
 
 # Owner PIN for saving prices (change here or set env OWNER_PIN).
@@ -76,6 +77,28 @@ def save_history_atomic(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
     tmp.replace(HISTORY_FILE)
+
+
+def load_bills():
+    if not BILLS_FILE.exists():
+        return {"entries": []}
+    with open(BILLS_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        return {"entries": []}
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        return {"entries": []}
+    return {"entries": entries}
+
+
+def save_bills_atomic(data):
+    BILLS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = BILLS_FILE.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    tmp.replace(BILLS_FILE)
 
 
 def _parse_ts(iso_s):
@@ -178,6 +201,51 @@ def api_price_history():
         return jsonify({"ok": False, "error": "Wrong PIN."}), 403
     data = load_history()
     return jsonify({"ok": True, "entries": data.get("entries", []), "retain_days": HISTORY_RETAIN_DAYS})
+
+
+@app.get("/api/bill-history")
+def api_get_bills():
+    pin = request.args.get("pin", "")
+    if not isinstance(pin, str) or pin != OWNER_PIN:
+        return jsonify({"ok": False, "error": "Wrong PIN."}), 403
+    data = load_bills()
+    return jsonify({"ok": True, "entries": data.get("entries", [])})
+
+
+@app.post("/api/bill-history")
+def api_save_bills():
+    body = request.get_json(silent=True) or {}
+    pin = body.get("pin", "")
+    if not isinstance(pin, str) or pin != OWNER_PIN:
+        return jsonify({"ok": False, "error": "Wrong PIN."}), 403
+    
+    bills = body.get("bills")
+    if not isinstance(bills, list):
+        return jsonify({"ok": False, "error": "Bills must be an array."}), 400
+    
+    try:
+        data = {"entries": bills}
+        save_bills_atomic(data)
+        return jsonify({"ok": True})
+    except OSError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
+@app.delete("/api/bill-history/<bill_id>")
+def api_delete_bill(bill_id):
+    pin = request.args.get("pin", "")
+    if not isinstance(pin, str) or pin != OWNER_PIN:
+        return jsonify({"ok": False, "error": "Wrong PIN."}), 403
+    
+    data = load_bills()
+    entries = data.get("entries", [])
+    entries = [e for e in entries if e.get("id") != bill_id]
+    try:
+        data["entries"] = entries
+        save_bills_atomic(data)
+        return jsonify({"ok": True})
+    except OSError as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":

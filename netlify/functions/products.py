@@ -6,6 +6,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 PRODUCTS_FILE = BASE_DIR / "data" / "products.json"
 HISTORY_FILE = BASE_DIR / "data" / "price_history.json"
+BILLS_FILE = BASE_DIR / "data" / "bills.json"
 HISTORY_RETAIN_DAYS = 365
 OWNER_PIN = os.environ.get("OWNER_PIN", "1234")
 
@@ -44,6 +45,28 @@ def save_history_atomic(data):
         json.dump(data, f, ensure_ascii=False, indent=2)
         f.write("\n")
     tmp.replace(HISTORY_FILE)
+
+
+def load_bills():
+    if not BILLS_FILE.exists():
+        return {"entries": []}
+    with open(BILLS_FILE, encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        return {"entries": []}
+    entries = data.get("entries")
+    if not isinstance(entries, list):
+        return {"entries": []}
+    return {"entries": entries}
+
+
+def save_bills_atomic(data):
+    BILLS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = BILLS_FILE.with_suffix(".json.tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    tmp.replace(BILLS_FILE)
 
 
 def prices_equal(p1, p2):
@@ -172,5 +195,51 @@ def handler(event, context):
             return make_response(load_products())
         except Exception as e:
             return make_response({"ok": False, "error": str(e)}, 500)
+
+    if path.endswith("/bill-history") or "/bill-history/" in path:
+        params = event.get("queryStringParameters") or {}
+        pin = params.get("pin", "")
+        
+        # Handle DELETE /bill-history/{bill_id}
+        if method == "DELETE":
+            if pin != OWNER_PIN:
+                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
+            # Extract bill_id from path
+            bill_id = path.split("/bill-history/")[-1] if "/bill-history/" in path else ""
+            if not bill_id:
+                return make_response({"ok": False, "error": "Bill ID required."}, 400)
+            data = load_bills()
+            entries = data.get("entries", [])
+            entries = [e for e in entries if e.get("id") != bill_id]
+            try:
+                data["entries"] = entries
+                save_bills_atomic(data)
+                return make_response({"ok": True})
+            except OSError as e:
+                return make_response({"ok": False, "error": str(e)}, 500)
+        
+        if method == "GET":
+            if pin != OWNER_PIN:
+                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
+            data = load_bills()
+            return make_response({"ok": True, "entries": data.get("entries", [])})
+        
+        if method == "POST":
+            try:
+                body = json.loads(event.get("body") or "{}")
+            except Exception:
+                body = {}
+            pin = body.get("pin", "")
+            if pin != OWNER_PIN:
+                return make_response({"ok": False, "error": "Wrong PIN."}, 403)
+            bills = body.get("bills")
+            if not isinstance(bills, list):
+                return make_response({"ok": False, "error": "Bills must be an array."}, 400)
+            try:
+                data = {"entries": bills}
+                save_bills_atomic(data)
+                return make_response({"ok": True})
+            except OSError as e:
+                return make_response({"ok": False, "error": str(e)}, 500)
 
     return make_response({"ok": False, "error": "Not found."}, 404)
